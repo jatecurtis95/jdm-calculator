@@ -281,8 +281,8 @@ var JDMCalculator = function() {
 
   var generatePDF = function() {
     if (!calc) return;
-    var jsPDF = window.jspdf && window.jspdf.jsPDF;
-    if (!jsPDF) { alert("PDF library not loaded yet, please try again."); return; }
+    var jsPDF = window.jspdf ? window.jspdf.jsPDF : null;
+    if (!jsPDF) { alert("jsPDF not loaded: " + JSON.stringify(Object.keys(window.jspdf || {}))); return; }
     var doc = new jsPDF({ unit: 'mm', format: 'a4' });
     var gold = [201, 168, 76];
     var darkGold = [139, 105, 20];
@@ -545,7 +545,7 @@ var JDMCalculator = function() {
           e("a", { href:"#", style:{fontSize:14, fontWeight:600, color:"#c9a84c", textDecoration:"none", borderBottom:"2px solid #c9a84c", paddingBottom:2} }, "Calculators")
         ),
         e("div", { style:{display:"flex", alignItems:"center", gap:16} },
-          e("a", { href:"mailto:imports@jdmconnect.com.au", className:"gold-btn", style:{padding:"9px 20px", borderRadius:8, fontSize:14, fontWeight:600, textDecoration:"none", display:"inline-block"} }, "Contact Us")
+          e("a", { href:"https://jdmconnect.com.au/contact", target:"_blank", className:"gold-btn", style:{padding:"9px 20px", borderRadius:8, fontSize:14, fontWeight:600, textDecoration:"none", display:"inline-block"} }, "Contact Us")
         )
       )
     ),
