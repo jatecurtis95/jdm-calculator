@@ -281,7 +281,7 @@ var JDMCalculator = function() {
 
   var generatePDF = function() {
     if (!calc) return;
-    var jsPDF = window.jspdf ? window.jspdf.jsPDF : null;
+    var jsPDF = window.jsPDF || (window.jspdf && window.jspdf.jsPDF);
     if (!jsPDF) { alert("jsPDF not loaded: " + JSON.stringify(Object.keys(window.jspdf || {}))); return; }
     var doc = new jsPDF({ unit: 'mm', format: 'a4' });
     var gold = [201, 168, 76];
