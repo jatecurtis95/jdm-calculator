@@ -7,6 +7,7 @@
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -47,7 +48,7 @@
   .total-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 2px solid #8B6914; margin-top: 4px; }
   .note-green { color: #059669; }
   .note-red { color: #dc2626; }
-  .sticky-panel { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; }
+  .sticky-panel { position: sticky; top: 80px; max-height: calc(100vh - 96px); overflow-y: auto; }
   @media (max-width: 1024px) { .sticky-panel { position: static; max-height: none; } }
   .main-grid { display: grid; grid-template-columns: 1.7fr 1fr; gap: 28px; max-width: 1200px; margin: 0 auto; padding: 0 24px 60px; }
   @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
@@ -277,6 +278,157 @@ var JDMCalculator = function() {
   var ERA_OFFSETS = { Reiwa: 2018, Heisei: 1988, Showa: 1925 };
   var jWesternYear = jYear && !isNaN(parseInt(jYear)) ? ERA_OFFSETS[jEra] + parseInt(jYear) : null;
   var _s20 = useState(false), copied = _s20[0], setCopied = _s20[1];
+
+  var generatePDF = function() {
+    if (!calc) return;
+    var jsPDF = window.jspdf && window.jspdf.jsPDF;
+    if (!jsPDF) { alert("PDF library not loaded yet, please try again."); return; }
+    var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    var gold = [201, 168, 76];
+    var darkGold = [139, 105, 20];
+    var black = [13, 13, 13];
+    var white = [255, 255, 255];
+    var gray = [107, 114, 128];
+    var pageW = 210;
+    var margin = 18;
+    var cw = pageW - margin * 2;
+    var y = 0;
+
+    // ── HEADER ──────────────────────────────────────────────────────────
+    doc.setFillColor(13, 13, 13);
+    doc.rect(0, 0, pageW, 28, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(201, 168, 76);
+    doc.text('JDM CONNECT', margin, 11);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(180, 150, 60);
+    doc.text('\u30B8\u30A7\u30FC\u30FB\u30C6\u30A3\u30FC\u30FB\u30A8\u30E0\u3092\u3064\u306A\u3050', margin, 17);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(255, 255, 255);
+    doc.text('LANDED COST ESTIMATE', pageW - margin, 11, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(180, 180, 180);
+    doc.text(new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }), pageW - margin, 17, { align: 'right' });
+    // gold divider
+    doc.setFillColor(201, 168, 76);
+    doc.rect(0, 28, pageW, 1.2, 'F');
+    y = 38;
+
+    // ── SUMMARY ─────────────────────────────────────────────────────────
+    var jpyDisplay = '\u00A5' + parseInt(jpyPrice || 0).toLocaleString();
+    var audDisplay = fmt(calc.purchaseAUD);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(13, 13, 13);
+    doc.text(jpyDisplay + '  \u2192  ' + audDisplay + ' AUD', margin, y);
+    y += 7;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(107, 114, 128);
+    doc.text('@ ' + fmtN(fxRate, 2) + ' AUD/JPY  \u00B7  ' + PORT_LABELS[destinationPort] + ' \u00B7 ' + regState + ' registration', margin, y);
+    y += 8;
+    doc.setFillColor(201, 168, 76);
+    doc.rect(margin, y, cw, 0.5, 'F');
+    y += 8;
+
+    // ── SECTION HELPERS ──────────────────────────────────────────────────
+    var sectionHeader = function(title) {
+      doc.setFillColor(254, 246, 224);
+      doc.rect(margin, y - 3.5, cw, 7, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(139, 105, 20);
+      doc.text(title, margin + 2, y + 1);
+      y += 8;
+    };
+
+    var lineItem = function(label, amount, note) {
+      if (y > 265) { doc.addPage(); y = 20; }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(55, 65, 81);
+      doc.text(label, margin + 3, y);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(13, 13, 13);
+      doc.text(amount, pageW - margin, y, { align: 'right' });
+      if (note) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(150, 150, 150);
+        doc.text(note, pageW - margin, y + 3.5, { align: 'right' });
+        y += 3;
+      }
+      doc.setDrawColor(235, 235, 235);
+      doc.setLineWidth(0.25);
+      doc.line(margin, y + 2, pageW - margin, y + 2);
+      y += 7;
+    };
+
+    // ── JAPAN ────────────────────────────────────────────────────────────
+    sectionHeader('JAPAN');
+    lineItem('Purchase price (bid)', fmt(calc.purchaseAUD));
+    lineItem('Handling charges', fmt(calc.ofukaHandlingAUD), '\u00A5' + calc.ofukaHandlingJPY.toLocaleString());
+    lineItem('Domestic transport & docs', fmt(calc.japanMiscAUD), '\u00A5100,000');
+    y += 2;
+
+    // ── SHIPPING ─────────────────────────────────────────────────────────
+    sectionHeader('SHIPPING');
+    lineItem('Ocean freight' + (activeLine ? ' \u2014 ' + activeLine.name : ''), fmt(calc.freightBase));
+    if (calc.bmsb > 0) lineItem('BMSB treatment', fmt(calc.bmsb));
+    lineItem('Marine insurance (1.5%)', fmt(calc.marineInsurance));
+    y += 2;
+
+    // ── AUSTRALIAN BORDER ────────────────────────────────────────────────
+    sectionHeader('AUSTRALIAN BORDER');
+    lineItem('Import duty', isNonJapanOrigin ? fmt(calc.importDuty) : '$0', isNonJapanOrigin ? null : 'Duty-free \u2014 JAEPA');
+    lineItem('GST (10%)', fmt(calc.gst));
+    lineItem('Customs entry fee', fmt(calc.customsEntryFee));
+    if (calc.daffCleaning > 0) lineItem('DAFF cleaning', fmt(calc.daffCleaning));
+    y += 2;
+
+    // ── ON-ROAD ──────────────────────────────────────────────────────────
+    sectionHeader('ON-ROAD');
+    lineItem('Compliance', fmt(calc.complianceCost));
+    lineItem('Agency fee', fmt(calc.agencyFee));
+    lineItem('LCT', calc.lct > 0 ? fmt(calc.lct) : '$0', calc.lct <= 0 ? 'Below threshold' : null);
+    if (includeDelivery) lineItem('Metro delivery (incl. GST)', fmt(calc.deliveryExGst + calc.deliveryGst));
+    if (includeOnRoad) {
+      lineItem('RWC (est.)', fmt(calc.rwcCost));
+      lineItem('Stamp duty (' + regState + ')', fmt(calc.stampDuty));
+      lineItem('Registration (est.)', fmt(calc.regoFee));
+    }
+    y += 6;
+
+    // ── GRAND TOTAL ──────────────────────────────────────────────────────
+    if (y > 260) { doc.addPage(); y = 20; }
+    doc.setFillColor(201, 168, 76);
+    doc.rect(margin, y, cw, 1.5, 'F');
+    y += 9;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(13, 13, 13);
+    doc.text('GRAND TOTAL', margin, y);
+    doc.setFontSize(17);
+    doc.text(fmt(calc.grandTotal), pageW - margin, y, { align: 'right' });
+    y += 8;
+    doc.setFillColor(201, 168, 76);
+    doc.rect(margin, y, cw, 1.5, 'F');
+    y += 9;
+
+    // ── FOOTER NOTE ──────────────────────────────────────────────────────
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(150, 150, 150);
+    doc.text('All figures are estimates \u2014 verify with your customs broker', margin, y);
+    doc.text('Generated by JDM Connect \u00B7 jdmconnect.com.au', pageW - margin, y, { align: 'right' });
+
+    doc.save('JDM-Connect-Landed-Cost-Estimate.pdf');
+  };
+
   var copyBreakdown = function() {
     if (!calc) return;
     var pad = function(s, n) { s = String(s); while (s.length < n) s = " "+s; return s; };
@@ -393,7 +545,7 @@ var JDMCalculator = function() {
           e("a", { href:"#", style:{fontSize:14, fontWeight:600, color:"#c9a84c", textDecoration:"none", borderBottom:"2px solid #c9a84c", paddingBottom:2} }, "Calculators")
         ),
         e("div", { style:{display:"flex", alignItems:"center", gap:16} },
-          e("button", { className:"gold-btn", style:{padding:"9px 20px", borderRadius:8, fontSize:14, fontWeight:600} }, "Contact Us")
+          e("a", { href:"mailto:imports@jdmconnect.com.au", className:"gold-btn", style:{padding:"9px 20px", borderRadius:8, fontSize:14, fontWeight:600, textDecoration:"none", display:"inline-block"} }, "Contact Us")
         )
       )
     ),
@@ -656,7 +808,7 @@ var JDMCalculator = function() {
           ),
 
           // BUTTONS
-          e("button", { className:"gold-btn", style:{width:"100%", padding:"14px", borderRadius:10, fontSize:15, fontWeight:700} }, "Download Full Estimate"),
+          e("button", { className:"gold-btn", onClick: generatePDF, disabled: !calc, style:{width:"100%", padding:"14px", borderRadius:10, fontSize:15, fontWeight:700, cursor: calc?"pointer":"not-allowed", opacity: calc?1:0.5} }, "Download Full Estimate"),
           e("button", {
             onClick: copyBreakdown,
             disabled: !calc,
