@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip3 install:*)",
+      "Bash(python3 -c \":*)",
+      "Bash(textutil -convert txt -stdout \"/Users/jatecurtis/Desktop/Calculator/jdm-data-reference.docx\")",
+      "Bash(node -e \":*)",
+      "Bash(sed -n '319,380p' \"C:\\\\Users\\\\jatec\\\\OneDrive - jdmconnect.com.au\\\\Claude\\\\calculator-preview.html\")",
+      "Bash(sed -n '319,380p' \"/c/Users/jatec/OneDrive - jdmconnect.com.au/Claude/calculator-preview.html\")"
+    ]
+  }
+}
