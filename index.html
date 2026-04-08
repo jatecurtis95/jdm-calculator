@@ -238,7 +238,8 @@ function getOfukaHandling(bidJPY) {
   return Math.round(bidJPY * 0.03);
 }
 
-var REGO_COSTS = { WA:400, NSW:380, VIC:900, QLD:350, SA:280, NT:200, ACT:500, TAS:260 };
+var REGO_COSTS = { WA:400, VIC:900, QLD:350, SA:280, NT:200, ACT:500, TAS:260 };
+var NSW_REGO = { blueSlip:42, greenSlip:820, regoFee:82, plateFee:57, mvt:[292,348,480,532] };
 
 var STATE_OPTIONS = [["WA","Western Australia"],["NSW","New South Wales"],["VIC","Victoria"],["QLD","Queensland"],["SA","South Australia"],["NT","Northern Territory"],["ACT","ACT"],["TAS","Tasmania"]];
 
@@ -291,6 +292,7 @@ function BreakdownRow(props) {
 var JDMCalculator = function() {
   var _s1 = useState(""), jpyPrice = _s1[0], setJpyPrice = _s1[1];
   var _s2 = useState(AUD_JPY_DEFAULT), fxRate = _s2[0], setFxRate = _s2[1];
+  var _s2b = useState(String(AUD_JPY_DEFAULT)), fxRateInput = _s2b[0], setFxRateInput = _s2b[1];
   var _s3 = useState("loading"), fxStatus = _s3[0], setFxStatus = _s3[1];
   var _s4 = useState(1), vehicleSizeIdx = _s4[0], setVehicleSizeIdx = _s4[1];
   var _s5 = useState("FREMANTLE"), destinationPort = _s5[0], setDestinationPort = _s5[1];
@@ -303,8 +305,8 @@ var JDMCalculator = function() {
   var _s12 = useState(null), selectedLineName = _s12[0], setSelectedLineName = _s12[1];
   var _s13 = useState(false), showLineSelector = _s13[0], setShowLineSelector = _s13[1];
   var _s14 = useState(false), isNonJapanOrigin = _s14[0], setIsNonJapanOrigin = _s14[1];
-  var _s15 = useState(1500), agencyFee = _s15[0], setAgencyFee = _s15[1];
-  var _s16 = useState(3500), complianceCost = _s16[0], setComplianceCost = _s16[1];
+  var _s15 = useState(1200), agencyFee = _s15[0], setAgencyFee = _s15[1];
+  var _s16 = useState(2500), complianceCost = _s16[0], setComplianceCost = _s16[1];
   var _s17 = useState(true), includeOnRoad = _s17[0], setIncludeOnRoad = _s17[1];
   var _s18 = useState("Reiwa"), jEra = _s18[0], setJEra = _s18[1];
   var _s19 = useState(""), jYear = _s19[0], setJYear = _s19[1];
@@ -424,9 +426,17 @@ var JDMCalculator = function() {
     lineItem('LCT', calc.lct > 0 ? fmt(calc.lct) : '$0', calc.lct <= 0 ? 'Below threshold' : null);
     if (includeDelivery) lineItem('Metro delivery (incl. GST)', fmt(calc.deliveryExGst + calc.deliveryGst));
     if (includeOnRoad) {
-      lineItem('RWC (est.)', fmt(calc.rwcCost));
       lineItem('Stamp duty (' + regState + ')', fmt(calc.stampDuty));
-      lineItem('Registration (est.)', fmt(calc.regoFee));
+      if (regState==='NSW') {
+        lineItem('Blue Slip (AUVIS)', fmt(calc.nswBlueSlip));
+        lineItem('Green Slip (CTP)', fmt(calc.nswGreenSlip));
+        lineItem('Registration fee', fmt(calc.nswRegoFee));
+        lineItem('Motor vehicle tax', fmt(calc.nswMVT));
+        lineItem('Plate fee', fmt(calc.nswPlateFee));
+      } else {
+        lineItem('RWC (est.)', fmt(calc.rwcCost));
+        lineItem('Registration (est.)', fmt(calc.regoFee));
+      }
     }
     y += 6;
 
@@ -487,9 +497,14 @@ var JDMCalculator = function() {
       row("Agency fee", fmt(calc.agencyFee)),
       row("LCT", calc.lct>0?fmt(calc.lct):"$0  (Below threshold)"),
       includeDelivery ? row("Metro delivery (incl. GST)", fmt(calc.deliveryExGst+calc.deliveryGst)) : "",
-      includeOnRoad ? row("RWC (est.)", fmt(calc.rwcCost)) : "",
       includeOnRoad ? row("Stamp duty ("+regState+")", fmt(calc.stampDuty)) : "",
-      includeOnRoad ? row("Registration (est.)", fmt(calc.regoFee)) : "",
+      includeOnRoad && regState==="NSW" ? row("Blue Slip (AUVIS)", fmt(calc.nswBlueSlip)) : "",
+      includeOnRoad && regState==="NSW" ? row("Green Slip (CTP)", fmt(calc.nswGreenSlip)) : "",
+      includeOnRoad && regState==="NSW" ? row("Registration fee", fmt(calc.nswRegoFee)) : "",
+      includeOnRoad && regState==="NSW" ? row("Motor vehicle tax", fmt(calc.nswMVT)) : "",
+      includeOnRoad && regState==="NSW" ? row("Plate fee", fmt(calc.nswPlateFee)) : "",
+      includeOnRoad && regState!=="NSW" ? row("RWC (est.)", fmt(calc.rwcCost)) : "",
+      includeOnRoad && regState!=="NSW" ? row("Registration (est.)", fmt(calc.regoFee)) : "",
       "",
       "=".repeat(44),
       "GRAND TOTAL"+pad(fmt(calc.grandTotal), 33),
@@ -509,8 +524,8 @@ var JDMCalculator = function() {
     setFxStatus("loading");
     fetch("https://api.frankfurter.dev/v1/latest?from=AUD&to=JPY")
       .then(function(r){ return r.json(); })
-      .then(function(d){ var rate=d&&d.rates&&d.rates.JPY; if(rate&&!isNaN(rate)){setFxRate(parseFloat(rate.toFixed(2)));setFxStatus("live");}else{return fetch("https://open.er-api.com/v6/latest/AUD").then(function(r2){return r2.json();}).then(function(d2){var rate2=d2&&d2.rates&&d2.rates.JPY;if(rate2&&!isNaN(rate2)){setFxRate(parseFloat(rate2.toFixed(2)));setFxStatus("live");}else{setFxStatus("fallback");}});}})
-      .catch(function(){ fetch("https://open.er-api.com/v6/latest/AUD").then(function(r2){return r2.json();}).then(function(d2){var rate2=d2&&d2.rates&&d2.rates.JPY;if(rate2&&!isNaN(rate2)){setFxRate(parseFloat(rate2.toFixed(2)));setFxStatus("live");}else{setFxStatus("fallback");}}).catch(function(){setFxStatus("fallback");}); });
+      .then(function(d){ var rate=d&&d.rates&&d.rates.JPY; if(rate&&!isNaN(rate)){var r=parseFloat(rate.toFixed(2));setFxRate(r);setFxRateInput(String(r));setFxStatus("live");}else{return fetch("https://open.er-api.com/v6/latest/AUD").then(function(r2){return r2.json();}).then(function(d2){var rate2=d2&&d2.rates&&d2.rates.JPY;if(rate2&&!isNaN(rate2)){var r3=parseFloat(rate2.toFixed(2));setFxRate(r3);setFxRateInput(String(r3));setFxStatus("live");}else{setFxStatus("fallback");}});}})
+      .catch(function(){ fetch("https://open.er-api.com/v6/latest/AUD").then(function(r2){return r2.json();}).then(function(d2){var rate2=d2&&d2.rates&&d2.rates.JPY;if(rate2&&!isNaN(rate2)){var r3=parseFloat(rate2.toFixed(2));setFxRate(r3);setFxRateInput(String(r3));setFxStatus("live");}else{setFxStatus("fallback");}}).catch(function(){setFxStatus("fallback");}); });
   };
   useEffect(function(){ fetchFxRate(); }, []);
 
@@ -550,11 +565,15 @@ var JDMCalculator = function() {
     var deliveryGst = Math.round(deliveryExGst*0.10);
     var retailValue = totalWithCompliance+lct;
     var stampDuty = Math.round(calcStampDuty(regState,retailValue));
-    var regoFee = REGO_COSTS[regState]||0;
-    var rwcCost = 175;
+    var regoFee, rwcCost, nswBlueSlip=0, nswGreenSlip=0, nswRegoFee=0, nswMVT=0, nswPlateFee=0;
+    if (regState==="NSW") {
+      nswBlueSlip=NSW_REGO.blueSlip; nswGreenSlip=NSW_REGO.greenSlip; nswRegoFee=NSW_REGO.regoFee;
+      nswMVT=NSW_REGO.mvt[vehicleSizeIdx]||NSW_REGO.mvt[1]; nswPlateFee=NSW_REGO.plateFee;
+      regoFee=nswBlueSlip+nswGreenSlip+nswRegoFee+nswMVT+nswPlateFee; rwcCost=0;
+    } else { regoFee=REGO_COSTS[regState]||0; rwcCost=175; }
     var grandTotal = totalWithCompliance+lct+deliveryExGst+deliveryGst+(includeOnRoad?stampDuty+regoFee+rwcCost:0);
-    return { purchaseAUD, ofukaHandlingJPY, ofukaHandlingAUD:Math.round(ofukaHandlingJPY/fxRate), japanMiscJPY, japanMiscAUD:Math.round(japanMiscJPY/fxRate), totalJapan:Math.round(totalJapan), freightBase, congestion, bmsb, marineInsurance, totalShipping:Math.round(totalShipping), cifValue:Math.round(cifValue), importDuty, gst, customsEntryFee, daffCleaning, agencyFee, landedAtPort:Math.round(landedAtPort), complianceCost, totalWithCompliance:Math.round(totalWithCompliance), lct, deliveryExGst, deliveryGst, retailValue:Math.round(retailValue), stampDuty, regoFee, rwcCost, grandTotal:Math.round(grandTotal) };
-  }, [jpyPrice, fxRate, vehicleSize, destinationPort, regState, isHybrid, isFuelEfficient, bmsbSeason, includeDaff, includeDelivery, selectedLineName, isNonJapanOrigin, agencyFee, complianceCost, activeLine, includeOnRoad]);
+    return { purchaseAUD, ofukaHandlingJPY, ofukaHandlingAUD:Math.round(ofukaHandlingJPY/fxRate), japanMiscJPY, japanMiscAUD:Math.round(japanMiscJPY/fxRate), totalJapan:Math.round(totalJapan), freightBase, congestion, bmsb, marineInsurance, totalShipping:Math.round(totalShipping), cifValue:Math.round(cifValue), importDuty, gst, customsEntryFee, daffCleaning, agencyFee, landedAtPort:Math.round(landedAtPort), complianceCost, totalWithCompliance:Math.round(totalWithCompliance), lct, deliveryExGst, deliveryGst, retailValue:Math.round(retailValue), stampDuty, regoFee, rwcCost, nswBlueSlip, nswGreenSlip, nswRegoFee, nswMVT, nswPlateFee, grandTotal:Math.round(grandTotal) };
+  }, [jpyPrice, fxRate, vehicleSize, vehicleSizeIdx, destinationPort, regState, isHybrid, isFuelEfficient, bmsbSeason, includeDaff, includeDelivery, selectedLineName, isNonJapanOrigin, agencyFee, complianceCost, activeLine, includeOnRoad]);
 
   var jpyNum = parseFloat(jpyPrice)||0;
   var audPreview = jpyNum > 0 ? Math.round(jpyNum/fxRate) : null;
@@ -617,7 +636,7 @@ var JDMCalculator = function() {
             e("div", null,
               e("div", { style:{fontSize:11, fontWeight:600, letterSpacing:"0.07em", textTransform:"uppercase", color:"#6b7280", marginBottom:4} }, "FX RATE (AUD → JPY)"),
               e("div", { style:{display:"flex", alignItems:"center", gap:10} },
-                e("input", { type:"number", step:"0.1", value:fxRate, onChange:function(ev){var v=parseFloat(ev.target.value);setFxRate(isNaN(v)?AUD_JPY_DEFAULT:v);}, style:{width:110, border:"1.5px solid #e5e7eb", borderRadius:6, padding:"6px 10px", fontSize:14, fontFamily:"monospace", fontWeight:600, outline:"none"} }),
+                e("input", { type:"text", inputMode:"decimal", value:fxRateInput, onChange:function(ev){setFxRateInput(ev.target.value);var v=parseFloat(ev.target.value);if(!isNaN(v)&&v>0)setFxRate(v);}, onBlur:function(){if(!fxRateInput||isNaN(parseFloat(fxRateInput))){setFxRateInput(String(fxRate));}}, style:{width:110, border:"1.5px solid #e5e7eb", borderRadius:6, padding:"6px 10px", fontSize:14, fontFamily:"monospace", fontWeight:600, outline:"none"} }),
                 e("button", { onClick:fetchFxRate, style:{padding:"6px 12px", border:"1.5px solid #c9a84c", borderRadius:6, background:"white", color:"#8B6914", fontSize:13, fontWeight:600, cursor:"pointer"} }, "↻ Refresh")
               )
             ),
@@ -636,30 +655,6 @@ var JDMCalculator = function() {
             isNonJapanOrigin ? e("div", { style:{marginTop:10, fontSize:12, color:"#dc2626", background:"#fef2f2", border:"1px solid #fecaca", borderRadius:6, padding:"6px 10px"} }, "⚠ 5% import duty applies — Japan-origin vehicles are duty-free under JAEPA") : null,
             isFuelEfficient ? e("div", { style:{marginTop:8, fontSize:12, color:"#8B6914"} }, "LCT threshold: $91,387 (fuel-efficient)") : null
           ),
-          // Japan Year Converter
-          e("div", { style:{borderTop:"1px solid #e5e7eb", marginTop:20, paddingTop:20} },
-            e("label", { className:"field-label", style:{marginBottom:12} }, "Japan Year Converter"),
-            e("div", { style:{display:"grid", gridTemplateColumns:"1fr 1fr", gap:12} },
-              e("div", null,
-                e("label", { className:"field-label" }, "Era"),
-                e("select", { value:jEra, onChange:function(ev){setJEra(ev.target.value); setJYear("");}, className:"field-input", style:{cursor:"pointer"} },
-                  e("option", { value:"Reiwa" }, "Reiwa (令和) — 2019+"),
-                  e("option", { value:"Heisei" }, "Heisei (平成) — 1989–2019"),
-                  e("option", { value:"Showa" }, "Showa (昭和) — 1926–1989")
-                )
-              ),
-              e("div", null,
-                e("label", { className:"field-label" }, "Year Number"),
-                e("input", { type:"number", min:"1", placeholder:"e.g. 6", value:jYear, onChange:function(ev){setJYear(ev.target.value);}, className:"field-input" })
-              )
-            ),
-            jWesternYear
-              ? e("div", { style:{marginTop:12, padding:"10px 14px", background:"#fef6e0", borderRadius:8, border:"1px solid #f0d080", display:"flex", alignItems:"center", gap:12} },
-                  e("div", { style:{fontSize:12, color:"#6b7280"} }, jEra+" "+jYear+" ="),
-                  e("div", { style:{fontSize:22, fontWeight:800, color:"#8B6914", letterSpacing:"-0.02em"} }, jWesternYear)
-                )
-              : e("div", { style:{marginTop:10, fontSize:12, color:"#9ca3af"} }, "Select an era and enter a year number")
-          )
         ),
 
         // CARD 02 — DESTINATION
@@ -680,7 +675,7 @@ var JDMCalculator = function() {
               ),
               e("div", { style:{color:"#6b7280"} },
                 e("span", { style:{fontWeight:600, color:"#374151"} }, "Rego: "),
-                "$"+(REGO_COSTS[regState]||0).toLocaleString()
+                regState==="NSW" ? "$"+(calc?calc.regoFee:0).toLocaleString()+" (detailed)" : "$"+(REGO_COSTS[regState]||0).toLocaleString()
               )
             ),
             e("div", { style:{marginTop:14} },
@@ -695,7 +690,7 @@ var JDMCalculator = function() {
             e("span", { className:"section-num" }, "03"),
             e("span", { className:"section-title" }, "Shipping Options")
           ),
-          e("div", { style:{fontSize:13, color:"#6b7280", marginBottom:20} }, "All shipping via Dolphin Shipping Australia — Apr 2025 rates"),
+          e("div", { style:{fontSize:13, color:"#6b7280", marginBottom:20} }, "Current shipping rates — updated Apr 2025"),
           availableLines.length === 0
             ? e("div", { style:{background:"#fef2f2", border:"1px solid #fecaca", borderRadius:8, padding:"12px 16px", fontSize:13, color:"#dc2626"} }, "No shipping lines available for this port and vehicle size combination.")
             : e(React.Fragment, null,
@@ -815,9 +810,14 @@ var JDMCalculator = function() {
               e(BreakdownRow, { label:"Agency fee", value:fmt(calc.agencyFee) }),
               calc.lct>0 ? e(BreakdownRow, { label:"LCT (33%)", value:fmt(calc.lct), highlight:true }) : e(BreakdownRow, { label:"LCT", value:"$0", note:"Below threshold", noteGreen:true }),
               includeDelivery ? e(BreakdownRow, { label:"Metro delivery (incl. GST)", value:fmt(calc.deliveryExGst+calc.deliveryGst) }) : null,
-              includeOnRoad ? e(BreakdownRow, { label:"RWC (est.)", value:fmt(calc.rwcCost) }) : null,
+              includeOnRoad && regState!=="NSW" ? e(BreakdownRow, { label:"RWC (est.)", value:fmt(calc.rwcCost) }) : null,
               includeOnRoad ? e(BreakdownRow, { label:"Stamp duty ("+regState+")", value:fmt(calc.stampDuty) }) : null,
-              includeOnRoad ? e(BreakdownRow, { label:"Registration (est.)", value:fmt(calc.regoFee) }) : null,
+              includeOnRoad && regState==="NSW" ? e(BreakdownRow, { label:"Blue Slip (AUVIS)", value:fmt(calc.nswBlueSlip) }) : null,
+              includeOnRoad && regState==="NSW" ? e(BreakdownRow, { label:"Green Slip (CTP)", value:fmt(calc.nswGreenSlip), note:"Annual — confirm your rate" }) : null,
+              includeOnRoad && regState==="NSW" ? e(BreakdownRow, { label:"Registration fee", value:fmt(calc.nswRegoFee) }) : null,
+              includeOnRoad && regState==="NSW" ? e(BreakdownRow, { label:"Motor vehicle tax", value:fmt(calc.nswMVT), note:vehicleSize.label }) : null,
+              includeOnRoad && regState==="NSW" ? e(BreakdownRow, { label:"Plate fee", value:fmt(calc.nswPlateFee) }) : null,
+              includeOnRoad && regState!=="NSW" ? e(BreakdownRow, { label:"Registration (est.)", value:fmt(calc.regoFee) }) : null,
               // Total
               e("div", { className:"total-row" },
                 e("span", { style:{fontSize:14, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", color:"#8B6914"} }, "Grand Total"),
@@ -837,24 +837,11 @@ var JDMCalculator = function() {
             style:{width:"100%", padding:"13px", borderRadius:10, fontSize:15, fontWeight:600, background: copied?"#059669":"white", border:"1.5px solid "+(copied?"#059669":"#e5e7eb"), cursor: calc?"pointer":"not-allowed", color: copied?"white":"#374151", transition:"all 0.2s"}
           }, copied ? "✓ Copied to clipboard!" : "Copy Cost Breakdown"),
 
-          // LIVE RATE WIDGET
-          e("div", { style:{background:"white", border:"1px solid #e5e7eb", borderRadius:10, padding:"14px 16px", display:"flex", alignItems:"center", gap:12} },
-            e("div", { style:{width:36, height:36, borderRadius:8, background:"#fef6e0", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0} },
-              e("span", { style:{fontSize:18} }, "💱")
-            ),
-            e("div", null,
-              e("div", { style:{fontSize:12, fontWeight:700, color:"#1a1a1a"} }, "Live Exchange Rate"),
-              e("div", { style:{fontSize:12, color:"#6b7280", marginTop:2} },
-                "1 AUD = "+(fxRate>0?Math.round(fxRate).toLocaleString():"—")+" JPY · ",
-                e("span", { style:{color: fxStatus==="live"?"#059669":"#d97706"} }, fxStatus==="live"?"Updated live":"Estimated")
-              )
-            )
-          ),
 
           // DISCLAIMER
           e("div", { style:{background:"#f9fafb", border:"1px solid #e5e7eb", borderRadius:10, padding:"14px 16px", fontSize:12, color:"#6b7280", lineHeight:1.6} },
             e("div", { style:{fontWeight:600, color:"#374151", marginBottom:4} }, "Important Notes"),
-            e("div", null, "• Shipping via Dolphin Shipping Australia (Apr 2025 rates)"),
+            e("div", null, "• Shipping rates current as of Apr 2025"),
             e("div", null, "• Import duty: 0% Japan-origin (JAEPA) / 5% non-FTA"),
             e("div", null, "• LCT thresholds FY2025–26: $80,567 / $91,387 fuel-efficient"),
             e("div", null, "• All figures are estimates — verify with your customs broker")
